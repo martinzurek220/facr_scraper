@@ -7,6 +7,7 @@ import time
 import sys
 import os
 import csv
+import re
 
 import requests
 from bs4 import BeautifulSoup
@@ -3143,8 +3144,8 @@ Sys.WebForms.PageRequestManager._initialize('ctl00$ScriptManager1', 'form1', [],
 
         <tr class="odd">
             <td class="w1 first">4R</td>
-            <td></td>            
-            <td class="clenid"></td>
+            <td>4Rj</td>            
+            <td class="clenid">4Rc</td>
 
             <td><span class="label">Doba hry:</span>45+1 ; 45+1</td>
             <td class="last"><span class="label">Povrch hr. pl.:</span>Tráva</td>
@@ -3155,9 +3156,9 @@ Sys.WebForms.PageRequestManager._initialize('ctl00$ScriptManager1', 'form1', [],
 
         <tr>
             <td class="w1 first">DFA</td>
-            <td></td>
+            <td>DFAj</td>
             
-            <td class="clenid"></td>
+            <td class="clenid">DFAc</td>
            <td colspan="2" class="last">
                 <span class="label ">Zápis vložil:</span> Růžička Milan (68100467)
             </td>
@@ -3165,8 +3166,8 @@ Sys.WebForms.PageRequestManager._initialize('ctl00$ScriptManager1', 'form1', [],
 
         <tr class="last odd">
             <td class="first">TD</td>
-            <td></td>
-            <td class="clenid"></td>
+            <td>TDj</td>
+            <td class="clenid">TDc</td>
             <td colspan="2" class="last">
                 
                  RA:
@@ -4216,35 +4217,76 @@ def stahni_hlavicku_zapisu(naparsovany_zapis):
 def stahni_vysledky(naparsovany_zapis):
     tabulka_vysledky = naparsovany_zapis.find("table", {"class": "vysledky"})
 
-    data_vysledky_hlavicka = ["Domácí - číslo", "Domácí - text", "Hosté - číslo", "Hosté - text", "R", "AR1", "AR2",
-                              "4R", "DFA", "Stadion", "Výsledek utkání", "Poločas utkání", "Diváků", "Doba hry",
-                              "Povrch hr. pl.", "Zápis vložil", "RA"]
+    data_vysledky_hlavicka = [
+        "Domácí - číslo", "Domácí - text", "Hosté - číslo", "Hosté - text", "R jméno", "R číslo", "AR1 jméno",
+        "AR1 číslo", "AR2 jméno"#, "AR2 číslo", "4R jméno", "4R číslo", "DFA jméno", "DFA číslo", "TD jméno",
+        #"TD číslo", "Stadion", "Výsledek utkání", "Poločas utkání", "Diváků", "Doba hry 1. poločas",
+        #"Doba hry 2. poločas", "Povrch hr. pl.", "Zápis vložil", "RA"
+    ]
 
-    # TODO dodelat regularni vyraz na odstraneni mezer mezi nazvem klubu a "B"
+    # TODO co je (N) u AR1 a AR2? Odstranit to?
+    # Doplnit kolonku cislo u R, AR1 a AR2
     domaci_cislo_text = tabulka_vysledky.find("tr", {"class": "first odd"}).find("td", {"class": "hl1 first"}).b.text
     domaci_cislo, domaci_text = domaci_cislo_text.split("-")
     domaci_cislo = domaci_cislo.strip()
     domaci_text = domaci_text.strip()
+    # Smaze mezery navic mezi nazvem tymu a "B"
+    domaci_text = re.sub(r"\s{2,}", " ", domaci_text)
     hoste_cislo_text = tabulka_vysledky.find("tr", {"class": "first odd"}).find("td", {"class": "hl1 last"}).b.text
     hoste_cislo, hoste_text = hoste_cislo_text.split("-")
     hoste_cislo = hoste_cislo.strip()
     hoste_text = hoste_text.strip()
-    r = None
-    ar1 = None
-    ar2 = None
-    r4 = None
-    dfa = None
-    stadion = None
-    vysledek_utkani = None
-    polocas_utkani = None
-    divaku = None
-    doba_hry = None
-    povrch_hr_pl = None
-    zapis_vlozil = None
-    ra = None
+    # Smaze mezery navic mezi nazvem tymu a "B"
+    hoste_text = re.sub(r"\s{2,}", " ", hoste_text)
+    r_jmeno = tabulka_vysledky.tr.find_next_sibling().td.find_next_sibling().text
+    r_cislo = tabulka_vysledky.tr.find_next_sibling().td.find_next_sibling().find_next_sibling().text
+    ar1_jmeno = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().td.find_next_sibling().text
+    ar1_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().td.find_next_sibling()\
+        .find_next_sibling().text
+    ar2_jmeno = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().td\
+        .find_next_sibling().text
+    ar2_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().td\
+        .find_next_sibling().find_next_sibling().text
+    # TODO smazat z html kodu R4j, R4c, DFAj, DFAc, TDj, TDc
+    r4_jmeno = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
+        .td.find_next_sibling().text
+    r4_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
+        .td.find_next_sibling().find_next_sibling().text
+    dfa_jmeno = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
+        .find_next_sibling().td.find_next_sibling().text
+    dfa_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
+        .find_next_sibling().td.find_next_sibling().find_next_sibling().text
+    td_jmeno = tabulka_vysledky.find("tr", {"class": "last odd"}).td.find_next_sibling().text
+    td_cislo = tabulka_vysledky.find("tr", {"class": "last odd"}).td.find_next_sibling().find_next_sibling().text
+    stadion = tabulka_vysledky.tr.find_next_sibling().find("td", {"class": "last"}).text.replace("Stadion: ", "")
+    # TODO doladit pokutove kopy
+    vysledek_utkani = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().td.find_next_sibling()\
+        .find_next_sibling().find_next_sibling().find("span", {"class": "vysledek-utkani"}).text
+    polocas_utkani = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find("td", {"class": "last"})\
+        .find("span", {"class": "vysledek-utkani"}).text.strip("\n ")
+    divaku = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().td.\
+        find_next_sibling().find_next_sibling().find_next_sibling().text.strip("\n ").replace("Diváků: ", "")
+    # Odstraneni prebytecnych mezer - odstrani jednu a vice mezer a nahradi ji zadnou mezerou
+    divaku = re.sub(r"\s+", "", divaku)
+    doba_hry_prvni_polocas, doba_hry_druhy_polocas = tabulka_vysledky.tr.find_next_sibling().find_next_sibling()\
+        .find_next_sibling().find_next_sibling().td.find_next_sibling().find_next_sibling().find_next_sibling()\
+        .text.replace("Doba hry:", "").split(";")
+    doba_hry_prvni_polocas = doba_hry_prvni_polocas.strip()
+    doba_hry_druhy_polocas = doba_hry_druhy_polocas.strip()
+    povrch_hr_pl = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
+        .td.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling().text\
+        .replace("Povrch hr. pl.:", "")
+    zapis_vlozil = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
+        .find_next_sibling().find("td", {"class": "last"}).text.replace("Zápis vložil: ", "").strip("\n ")
+    # TODO co je RA a v jakém formátu to bude? Zatím tam jsou jen dvě závorky ()
+    ra = tabulka_vysledky.find("tr", {"class": "last odd"}).find("td", {"class": "last"}).text\
+        .replace("RA:", "").strip("\n ")
 
-    data_vysledky_obsah = [domaci_cislo, domaci_text, hoste_cislo, hoste_text, r, ar1, ar2, r4, dfa, stadion,
-                           vysledek_utkani, polocas_utkani, divaku, doba_hry, povrch_hr_pl, zapis_vlozil, ra]
+    data_vysledky_obsah = [
+        domaci_cislo, domaci_text, hoste_cislo, hoste_text, r_jmeno, r_cislo, ar1_jmeno, ar1_cislo, ar2_jmeno#,
+        #ar2_cislo, r4_jmeno, r4_cislo, dfa_jmeno, dfa_cislo, td_jmeno, td_cislo, stadion, vysledek_utkani,
+        #polocas_utkani, divaku, doba_hry_prvni_polocas, doba_hry_druhy_polocas, povrch_hr_pl, zapis_vlozil, ra
+    ]
 
     print([data_vysledky_hlavicka, data_vysledky_obsah])
 
@@ -4255,7 +4297,8 @@ def stahni_data_hracu(naparsovany_zapis, domaci_hoste):
     if domaci_hoste == "domaci":
         hraci = naparsovany_zapis.find("table", {"class": "vysledky hraci"}).tbody.tr.td.find_all("tr")
     elif domaci_hoste == "hoste":
-        hraci = naparsovany_zapis.find("table", {"class": "vysledky hraci"}).tbody.tr.find("td", {"class": "hl1 last"}).find_all("tr")
+        hraci = naparsovany_zapis.find("table", {"class": "vysledky hraci"}).tbody.tr.find("td", {"class": "hl1 last"})\
+            .find_all("tr")
 
     hraci_statistika = []
     hraci_statistika_hlavicka = ["Číslo", "Příjmení a jméno", "Post", "ID", "Střídání", "-", "ŽK", "-", "ČK", "BR"]
@@ -4334,12 +4377,13 @@ def main():
 
     naparsovany_zapis = naparsuj_zapis(prvni_zapis)
 
-    # data_hlavicka_zapisu = stahni_hlavicku_zapisu(naparsovany_zapis)
+    data_hlavicka_zapisu = stahni_hlavicku_zapisu(naparsovany_zapis)
     data_vysledky = stahni_vysledky(naparsovany_zapis)
     # data_hraci_domaci = stahni_data_hracu(naparsovany_zapis, "domaci")
     # data_hraci_hoste = stahni_data_hracu(naparsovany_zapis, "hoste")
 
-    # vygeneruj_csv_soubor("data_hlavicka_zapisu.csv", data_hlavicka_zapisu)
+    vygeneruj_csv_soubor("data_hlavicka_zapisu.csv", data_hlavicka_zapisu)
+    vygeneruj_csv_soubor("data_vysledky.csv", data_vysledky)
     # vygeneruj_csv_soubor("data_hraci_domaci.csv", data_hraci_domaci)
     # vygeneruj_csv_soubor("data_hraci_hoste.csv", data_hraci_hoste)
 
