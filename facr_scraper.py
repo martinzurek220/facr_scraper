@@ -18,6 +18,7 @@ import sys
 import os
 import csv
 import re
+import json
 
 import requests
 from bs4 import BeautifulSoup
@@ -148,7 +149,7 @@ def stahni_html_kod_rucne(html_kod: str) -> BeautifulSoup:
 
 def naparsuj_html_kod_ze_stringu(html_kod: str) -> BeautifulSoup:
     """
-    Funkce prevede html kod "str" na naparsovany objekt Beautifulsoup, ve kterem uz je mozno vyhledavat.
+    Funkce prevede html kod ve formatu string na naparsovany objekt Beautifulsoup, ve kterem uz je mozno vyhledavat.
 
     Beautifulsoup =
     <html><body>
@@ -194,24 +195,92 @@ def stahni_odkazy_na_zapisy(browser: webdriver, url_soutez: str) -> list:
     return odkazy_na_zapisy
 
 
-def stahni_vsechny_zapisy_v_soutezi(browser: webdriver, odkazy_na_zapisy: list):
+# TODO prepsat return v dostring
+def stahni_html_a_naparsuj_vsechny_zapisy_v_soutezi(browser: webdriver, odkazy_na_zapisy: list):
     """
+    Funkce stahne ze vsech zapisu html kod, naparsuje do objektu BeautifulSoup a uloží do listu.
 
+    Priklad vystupu:
+    [objekt_BeautifulSoup1, objekt_BeautifulSoup2, objekt_BeautifulSoup3, ...]
 
-    :param browser:
-    :param odkazy_na_zapisy:
-    :return:
+    :param browser: webdriver
+    :param odkazy_na_zapisy: odkazy_na_zapisy
+    :return: [[naparsovany_zapis1], [naparsovany_zapis2], [naparsovany_zapis3], ...]
     """
-    naparsovane_zapisy = []
+    zapisy = []
     for odkaz_na_zapis in odkazy_na_zapisy:
-        html = stahni_html_kod_seleinum(browser, odkaz_na_zapis)
-        bs_obj = naparsuj_html_kod_ze_stringu(html)
-        naparsovane_zapisy.append(bs_obj)
+        str_html = stahni_html_kod_seleinum(browser, odkaz_na_zapis)
+        bs_obj = naparsuj_html_kod_ze_stringu(str_html)
+        zapisy.append([str_html, bs_obj])
 
-    return naparsovane_zapisy
+    return [zapisy]
 
 
-def stahni_zapis(html_kod_str: str):
+def naparsuj_vsechny_zapisy_ze_stringu_v_listu(str_zapisy: list):
+    zapisy = []
+    for str_zapis in str_zapisy:
+        bs_obj = naparsuj_html_kod_ze_stringu(str_zapis)
+        zapisy.append([str_zapis, bs_obj])
+
+    return zapisy
+
+
+def uloz_vsechny_stazene_html_kody_ve_stringu_do_jsonu(slovnik_se_zapisy):
+    # print(slovnik_se_zapisy)
+    with open('myfile.json', 'w', encoding='utf8') as json_file:
+        json.dump(slovnik_se_zapisy, json_file, indent=2, ensure_ascii=False, allow_nan=True)
+
+
+def nacti_zapisy_z_jsonu():
+    with open('myfile.json', 'r', encoding='utf8') as json_file:
+        j = json.load(json_file)
+        print(j)
+        print(type(j["2022110A4C0104"]))
+
+    zapis = j["2022110A4C0104"]
+
+    return zapis
+
+
+def ziskej_data_ze_zapisu(naparsovany_zapis):
+    data_hlavicka_zapisu = stahni_hlavicku_zapisu(naparsovany_zapis)
+    cislo_utkani = data_hlavicka_zapisu[1][0]
+    data_vysledky = stahni_tabulku_vysledky(naparsovany_zapis)
+    data_hraci_domaci = stahni_tabulku_hraci(naparsovany_zapis, "domaci")
+    data_hraci_hoste = stahni_tabulku_hraci(naparsovany_zapis, "hoste")
+    data_funkcionari_domaci = stahni_tabulku_funkcionari(naparsovany_zapis, "domaci")
+    data_funkcionari_hoste = stahni_tabulku_funkcionari(naparsovany_zapis, "hoste")
+    data_osobni_tresty_domaci = stahni_tabulku_osobni_tresty(naparsovany_zapis, "domaci")
+    data_osobni_tresty_hoste = stahni_tabulku_osobni_tresty(naparsovany_zapis, "hoste")
+    data_strelci_domaci = stahni_tabulku_strelci(naparsovany_zapis, "domaci")
+    data_strelci_hoste = stahni_tabulku_strelci(naparsovany_zapis, "hoste")
+
+    print(f"Zpracovávám zápis z utkání číslo: {cislo_utkani}")
+
+    data_zapis = [
+        cislo_utkani, data_hlavicka_zapisu, data_vysledky, data_hraci_domaci, data_hraci_hoste, data_funkcionari_domaci,
+        data_funkcionari_hoste, data_osobni_tresty_domaci, data_osobni_tresty_hoste, data_strelci_domaci,
+        data_strelci_hoste
+    ]
+
+    return data_zapis
+
+
+def vygeneruj_csv_soubor_z_jednoho_zapisu(zpracovany_jeden_zapis):
+    cislo_utkani = zpracovany_jeden_zapis[0]
+    vygeneruj_csv_soubor(f"{cislo_utkani}_hlavicka_zapisu.csv", zpracovany_jeden_zapis[1])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_vysledky.csv", zpracovany_jeden_zapis[2])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_hraci_domaci.csv", zpracovany_jeden_zapis[3])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_hraci_hoste.csv", zpracovany_jeden_zapis[4])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_funkcionari_domaci.csv", zpracovany_jeden_zapis[5])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_funkcionari_hoste.csv", zpracovany_jeden_zapis[6])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_osobni_tresty_domaci.csv", zpracovany_jeden_zapis[7])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_osobni_tresty_hoste.csv", zpracovany_jeden_zapis[8])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_strelci_domaci.csv", zpracovany_jeden_zapis[9])
+    vygeneruj_csv_soubor(f"{cislo_utkani}_strelci_hoste.csv", zpracovany_jeden_zapis[10])
+
+
+def stahni_zapis_temp(html_kod_str: str):
     bs_obj = stahni_html_kod_rucne(html_kod_str)
     # print(bs_obj)
     hraci_domaci = bs_obj.find("td", {"class": "hl1 first"})
@@ -226,7 +295,7 @@ def temp_zkusebni_stazeni_zapisu(browser, url_technicky_doprovod):
     # print(html_1)
     # # html je class str
     # # print(type(html_1))
-    # # stahni_zapis(html_1)
+    # # stahni_zapis_temp(html_1)
     # print("======================================================================================================")
     #
     # browser.get(url_druhy_zapis)
@@ -235,7 +304,7 @@ def temp_zkusebni_stazeni_zapisu(browser, url_technicky_doprovod):
     # print(html_2)
     # # html je class str
     # # print(type(html_2))
-    # # stahni_zapis(html_2)
+    # # stahni_zapis_temp(html_2)
     # print("======================================================================================================")
     #
     # browser.get(url_treti_zapis)
@@ -244,7 +313,7 @@ def temp_zkusebni_stazeni_zapisu(browser, url_technicky_doprovod):
     # print(html_3)
     # # html je class str
     # # print(type(html_3))
-    # # stahni_zapis(html_3)
+    # # stahni_zapis_temp(html_3)
     # print("======================================================================================================")
 
     browser.get(url_technicky_doprovod)
@@ -253,7 +322,7 @@ def temp_zkusebni_stazeni_zapisu(browser, url_technicky_doprovod):
     print(html_4)
     # html je class str
     # print(type(html_4))
-    # stahni_zapis(html_4)
+    # stahni_zapis_temp(html_4)
     print("======================================================================================================")
 
 
@@ -267,7 +336,7 @@ def stahni_hlavicku_zapisu(naparsovany_zapis: BeautifulSoup) -> list:
 
     Priklad vystupu:
     [['Soutěž', 'Kolo', 'Číslo', 'Číslo utkání', 'Ročník', 'Den', 'Čas'],
-    ['23  M-2/C', '8', 'A4C', '2022110A4C0806', '2022', '08.10.2022', '10:15']]
+     ['23  M-2/C', '8', 'A4C', '2022110A4C0806', '2022', '08.10.2022', '10:15']]
 
     Prvni pozice je hlavicka, v druhe pozici jsou informace o zapase.
 
@@ -277,6 +346,7 @@ def stahni_hlavicku_zapisu(naparsovany_zapis: BeautifulSoup) -> list:
     tabulka_hlavicka = naparsovany_zapis.find("div", {"class": "book zapis-report"}).tbody.tbody
 
     data_hlavicka_hlavicka = ["Číslo utkání", "Soutěž", "Kolo", "Číslo", "Číslo utkání", "Ročník", "Den", "Čas"]
+
     soutez = tabulka_hlavicka.find("tr", {"class": "first odd"}).td.text.strip("\n ")
     kolo = tabulka_hlavicka.find("tr", {"class": "first odd"}).find("td", {"class": "last"}).text.strip("\n ")
     cislo = tabulka_hlavicka.tr.find_next_sibling().td.text.strip("\n ")
@@ -287,12 +357,22 @@ def stahni_hlavicku_zapisu(naparsovany_zapis: BeautifulSoup) -> list:
 
     data_hlavicka_obsah = [cislo_utkani, soutez, kolo, cislo, cislo_utkani, rocnik, den, cas]
 
-    print(f"Hlavička zápisu: {[data_hlavicka_hlavicka, data_hlavicka_obsah]}")
+    # print(f"Hlavička zápisu: {[data_hlavicka_hlavicka, data_hlavicka_obsah]}")
 
     return [data_hlavicka_hlavicka, data_hlavicka_obsah]
 
 
-def stahni_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
+def stahni_tabulku_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
+    """
+    Funkce vygeneruje vysledky utkani.
+
+    Priklad vystupu:
+    [['Domácí - číslo', 'Domácí - text', 'Hosté - číslo', 'Hosté - text', ...],
+     ['10A0031', 'Sportovní klub Dolní Měcholupy,o.s.', '1040221', 'FK Dukla Jižní Město z.s. "B"', ...]]
+
+    :param naparsovany_zapis: objekt BeautifulSoup
+    :return: [[vysledky_zapasu_hlavicka], [vysledky_zapasu]]
+    """
     tabulka_vysledky = naparsovany_zapis.find("div", {"class": "book zapis-report"})\
         .find("table", {"class": "vysledky"})
 
@@ -304,7 +384,6 @@ def stahni_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
     ]
 
     # TODO co je (N) u AR1 a AR2? Odstranit to?
-    # TODO Doplnit kolonku cislo u R, AR1 a AR2
     domaci_cislo_text = tabulka_vysledky.find("tr", {"class": "first odd"}).find("td", {"class": "hl1 first"}).b.text
     domaci_cislo, domaci_text = domaci_cislo_text.split("-")
     domaci_cislo = domaci_cislo.strip()
@@ -326,7 +405,6 @@ def stahni_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
         .find_next_sibling().text
     ar2_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().td\
         .find_next_sibling().find_next_sibling().text
-    # TODO smazat z html kodu R4j, R4c, DFAj, DFAc, TDj, TDc
     r4_jmeno = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
         .td.find_next_sibling().text
     r4_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
@@ -338,13 +416,16 @@ def stahni_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
     td_jmeno = tabulka_vysledky.find("tr", {"class": "last odd"}).td.find_next_sibling().text
     td_cislo = tabulka_vysledky.find("tr", {"class": "last odd"}).td.find_next_sibling().find_next_sibling().text
     stadion = tabulka_vysledky.tr.find_next_sibling().find("td", {"class": "last"}).text.replace("Stadion: ", "")
-    # TODO doladit pokutove kopy
-    vysledek_utkani = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().td.find_next_sibling()\
-        .find_next_sibling().find_next_sibling().find("span", {"class": "vysledek-utkani"}).text
+    # TODO budou v tabulce pokutove kopy?
+    vysledek_utkani_temp = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().td.find_next_sibling()\
+        .find_next_sibling().find_next_sibling().find("span", {"class": "vysledek-utkani"})\
+        .text.strip("\n ").split("\n")
+    vysledek_utkani = vysledek_utkani_temp[0]
+    # pokutove_kopy = vysledek_utkani_temp[1].strip(" ")
     polocas_utkani = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find("td", {"class": "last"})\
         .find("span", {"class": "vysledek-utkani"}).text.strip("\n ")
-    divaku = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().td.\
-        find_next_sibling().find_next_sibling().find_next_sibling().text.strip("\n ").replace("Diváků: ", "")
+    divaku = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling()\
+        .find("td", {"class": "last"}).text.strip("\n ").replace("Diváků: ", "")
     # Odstraneni prebytecnych mezer - odstrani jednu a vice mezer a nahradi ji zadnou mezerou
     divaku = re.sub(r"\s+", "", divaku)
     doba_hry_prvni_polocas, doba_hry_druhy_polocas = tabulka_vysledky.tr.find_next_sibling().find_next_sibling()\
@@ -353,13 +434,12 @@ def stahni_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
     doba_hry_prvni_polocas = doba_hry_prvni_polocas.strip()
     doba_hry_druhy_polocas = doba_hry_druhy_polocas.strip()
     povrch_hr_pl = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
-        .td.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling().text\
-        .replace("Povrch hr. pl.:", "")
-    zapis_vlozil = tabulka_vysledky.tr.find_next_sibling().find_next_sibling().find_next_sibling().find_next_sibling()\
-        .find_next_sibling().find("td", {"class": "last"}).text.replace("Zápis vložil: ", "").strip("\n ")
-    # TODO dodelat zapis vlozil jmeno a cislo
-    zapis_vlozil_jmeno = zapis_vlozil
-    zapis_vlozil_cislo = zapis_vlozil
+        .find("td", {"class": "last"}).text.replace("Povrch hr. pl.:", "")
+    zapis_vlozil_jmeno, zapis_vlozil_cislo = tabulka_vysledky.tr.find_next_sibling().find_next_sibling()\
+        .find_next_sibling().find_next_sibling().find_next_sibling().find("td", {"class": "last"})\
+        .text.replace("Zápis vložil: ", "").strip("\n ").split("(")
+    zapis_vlozil_jmeno = zapis_vlozil_jmeno.strip(" ")
+    zapis_vlozil_cislo = zapis_vlozil_cislo.strip(") ")
     # TODO co je RA a v jakém formátu to bude? Zatím tam jsou jen dvě závorky ()
     ra = tabulka_vysledky.find("tr", {"class": "last odd"}).find("td", {"class": "last"}).text\
         .replace("RA:", "").strip("\n ")
@@ -371,14 +451,12 @@ def stahni_vysledky(naparsovany_zapis: BeautifulSoup) -> list:
         zapis_vlozil_cislo, ra
     ]
 
-    print(f"Výsledky zápasu : {[data_vysledky_hlavicka, data_vysledky_obsah]}")
+    # print(f"Výsledky zápasu : {[data_vysledky_hlavicka, data_vysledky_obsah]}")
 
-    # TODO dodelat return
-    # return [data_vysledky_hlavicka, data_vysledky_obsah]
-    return [data_vysledky_hlavicka]
+    return [data_vysledky_hlavicka, data_vysledky_obsah]
 
 
-def stahni_data_hracu(naparsovany_zapis: BeautifulSoup, domaci_hoste: str) -> list:
+def stahni_tabulku_hraci(naparsovany_zapis: BeautifulSoup, domaci_hoste: str) -> list:
     """
     Funkce vygeneruje vsechny hrace v zapase.
 
@@ -426,7 +504,8 @@ def stahni_data_hracu(naparsovany_zapis: BeautifulSoup, domaci_hoste: str) -> li
 
         if zapis_do_statistik:
             data_hraci.append(jeden_hrac)
-    print(f"{popis} {data_hraci}")
+
+    # print(f"{popis} {data_hraci}")
 
     return data_hraci
 
@@ -474,7 +553,8 @@ def stahni_tabulku_funkcionari(naparsovany_zapis: BeautifulSoup, domaci_hoste: s
                 temp = td.text.strip().split("\n")
                 jeden_funkcionar.extend(temp)
             data_funkcionari.append(jeden_funkcionar)
-    print(f"{popis} {data_funkcionari}")
+
+    # print(f"{popis} {data_funkcionari}")
 
     return data_funkcionari
 
@@ -533,7 +613,7 @@ def stahni_tabulku_osobni_tresty(naparsovany_zapis: BeautifulSoup, domaci_hoste:
             data_osobni_tresty.append(jeden_osobni_trest)
 
     # TODO mam v listu jedny prazdne zavorky navic
-    print(f"{popis} {data_osobni_tresty}")
+    # print(f"{popis} {data_osobni_tresty}")
 
     return data_osobni_tresty
 
@@ -589,7 +669,8 @@ def stahni_tabulku_strelci(naparsovany_zapis: BeautifulSoup, domaci_hoste: str) 
                 temp = td.text.strip("\n ")
                 jeden_strelec.append(temp)
             data_strelci.append(jeden_strelec)
-    print(f"{popis} {data_strelci}")
+
+    # print(f"{popis} {data_strelci}")
 
     return data_strelci
 
@@ -604,7 +685,7 @@ def vygeneruj_csv_soubor(nazev_csv_souboru: str, data_pro_csv_tabulku: list[list
     """
     print(f"Ukladam stazena data do souboru: {nazev_csv_souboru}")
     # Nastaveni oddelovace na středník
-    csv.register_dialect('myDialect', delimiter=';', quoting=csv.QUOTE_NONE)
+    csv.register_dialect('myDialect', delimiter=';', quoting=csv.QUOTE_ALL)
     # Nachystani noveho souboru na zapis
     nove_csv = open(nazev_csv_souboru, mode="w", newline='', encoding='utf-8')
     # Vytvoreni noveho csv souboru
@@ -627,14 +708,43 @@ def main():
     url_treti_zapis = "https://is.fotbal.cz/zapasy/zapis-o-utkani-report.aspx?zapas=a31f61d1-53c0-4daf-9121-765a1e6ad2ee&zapis=1&noprint=1&btnprint=1&.htm"
     url_technicky_doprovod = "https://is.fotbal.cz/zapasy/zapis-o-utkani-report.aspx?zapas=5ca6a76a-5561-4aeb-807a-9b57c700a209&zapis=1&noprint=1&btnprint=1&.htm"
 
+    url_kostelec_sezona_2022 = "https://is.fotbal.cz/souteze/detail-souteze.aspx?req=4d854270-1b9d-4434-b8d8-dc9a9ac1d9fe"
+    url_kostelec_sezona_2021 = "https://is.fotbal.cz/souteze/detail-souteze.aspx?req=c3bd1317-a331-4dda-a7ec-785bab482331"
+    url_kostelec_sezona_2020 = "https://is.fotbal.cz/souteze/detail-souteze.aspx?req=3b4717df-3130-4146-bff2-b79c31cf5209"
+
+    url_nusle_sezona_2022 = "https://is.fotbal.cz/souteze/detail-souteze.aspx?req=ae9809e0-5712-4abd-b99a-997cf9d3d8c6"
+    url_nusle_sezona_2021 = "https://is.fotbal.cz/souteze/detail-souteze.aspx?req=fd1c5978-eaa9-4a28-8daf-70bbe8e6fffb"
+    url_nusle_sezona_2020 = "https://is.fotbal.cz/souteze/detail-souteze.aspx?req=c4556c06-706e-419e-a6dd-911f6776e19d"
+
     # Otevri url s capcha
-    browser = webdriver.Chrome()
+    # browser = webdriver.Chrome()
+    # odkazy_na_zapisy = stahni_odkazy_na_zapisy(browser, url_soutez)
+
     # browser.get(url_s_capcha)
 
     # capcha_solver(browser, sitekey, url_s_capcha)
 
     # browser = ""
-    odkazy_na_zapisy = stahni_odkazy_na_zapisy(browser, url_soutez)
+
+    # vsechny_zapisy_v_soutezi_html = stahni_html_a_naparsuj_vsechny_zapisy_v_soutezi(browser, odkazy_na_zapisy)
+
+    # # Nacteni z jsonu - zatim nefunguje
+    # hodnoty_z_jsonu = nacti_zapisy_z_jsonu()
+    # vsechny_zapisy_v_soutezi_html = naparsuj_vsechny_zapisy_ze_stringu_v_listu(hodnoty_z_jsonu)
+
+    # Zpracuje vsechny rucne stazene zapisy
+    vsechny_zapisy_v_soutezi_html_str = [ht.prvni_zapis, ht.druhy_zapis, ht.treti_zapis]
+    vsechny_zapisy_v_soutezi_html = naparsuj_vsechny_zapisy_ze_stringu_v_listu(vsechny_zapisy_v_soutezi_html_str)
+
+    slovnik_se_zapisy = {}
+    # Zpracuje data ze vsech zapisu a ulozi je do csv souboru
+    for str_jeden_zapis, naparsovany_jeden_zapis in vsechny_zapisy_v_soutezi_html:
+        zpracovany_jeden_zapis = ziskej_data_ze_zapisu(naparsovany_jeden_zapis)
+        cislo_utkani = zpracovany_jeden_zapis[0]
+        vygeneruj_csv_soubor_z_jednoho_zapisu(zpracovany_jeden_zapis)
+        slovnik_se_zapisy[cislo_utkani] = str_jeden_zapis
+
+    # uloz_vsechny_stazene_html_kody_ve_stringu_do_jsonu(slovnik_se_zapisy)
 
 
 
@@ -643,31 +753,11 @@ def main():
 
     # temp_zkusebni_stazeni_zapisu(browser, url_technicky_doprovod)
 
-    # naparsovany_zapis = naparsuj_zapis(ht.prvni_zapis)
-    # naparsovany_zapis = naparsuj_zapis(ht.zapis_s_osobnimi_tresty)
-
-    # data_hlavicka_zapisu = stahni_hlavicku_zapisu(naparsovany_zapis)
-    # cislo_utkani = data_hlavicka_zapisu[1][0]
-    # data_vysledky = stahni_vysledky(naparsovany_zapis)
-    # data_hraci_domaci = stahni_data_hracu(naparsovany_zapis, "domaci")
-    # data_hraci_hoste = stahni_data_hracu(naparsovany_zapis, "hoste")
-    # data_funkcionari_domaci = stahni_tabulku_funkcionari(naparsovany_zapis, "domaci")
-    # data_funkcionari_hoste = stahni_tabulku_funkcionari(naparsovany_zapis, "hoste")
-    # data_osobni_tresty_domaci = stahni_tabulku_osobni_tresty(naparsovany_zapis, "domaci")
-    # data_osobni_tresty_hoste = stahni_tabulku_osobni_tresty(naparsovany_zapis, "hoste")
-    # data_strelci_domaci = stahni_tabulku_strelci(naparsovany_zapis, "domaci")
-    # data_strelci_hoste = stahni_tabulku_strelci(naparsovany_zapis, "hoste")
-
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_hlavicka_zapisu.csv", data_hlavicka_zapisu)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_vysledky.csv", data_vysledky)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_hraci_domaci.csv", data_hraci_domaci)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_hraci_hoste.csv", data_hraci_hoste)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_funkcionari_domaci.csv", data_funkcionari_domaci)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_funkcionari_hoste.csv", data_funkcionari_hoste)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_osobni_tresty_domaci.csv", data_osobni_tresty_domaci)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_osobni_tresty_hoste.csv", data_osobni_tresty_hoste)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_strelci_domaci.csv", data_strelci_domaci)
-    # vygeneruj_csv_soubor(f"{cislo_utkani}_strelci_hoste.csv", data_strelci_hoste)
+    # #
+    # naparsovany_zapis = naparsuj_zapis(ht.druhy_zapis)
+    # # naparsovany_zapis = naparsuj_zapis(ht.zapis_s_osobnimi_tresty)
+    # data_vysledky = stahni_tabulku_vysledky(naparsovany_zapis)
+    # vygeneruj_csv_soubor(f"000_vysledky.csv", data_vysledky)
 
     # Cas, po ktery zustane prohlizec otevreny po vsech akcich
     # time.sleep(1000)
